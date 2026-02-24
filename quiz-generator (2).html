@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuizCraft — AI Quiz Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: #2a2a3d;
+    --accent: #7c6aff;
+    --accent2: #ff6a9e;
+    --text: #e8e8f0;
+    --muted: #7070a0;
+    --green: #22c87a;
+    --red: #ff4d6d;
+    --radius: 16px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background mesh */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 10%, rgba(124,106,255,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 80% 90%, rgba(255,106,158,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 12px;
+    display: grid; place-items: center;
+    font-size: 20px;
+  }
+
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, #fff 30%, var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header p {
+    color: var(--muted);
+    font-size: 0.95rem;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+
+  .card-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-label::before {
+    content: '';
+    display: block;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  input[type="password"], textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+    resize: none;
+  }
+
+  input[type="password"]:focus, textarea:focus {
+    border-color: var(--accent);
+  }
+
+  input[type="password"]::placeholder, textarea::placeholder {
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  textarea { min-height: 160px; line-height: 1.6; }
+
+  .char-count {
+    text-align: right;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* Generate button */
+  .btn-generate {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), #9b6aff);
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+    position: relative;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .btn-generate:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+  .btn-generate:active:not(:disabled) { transform: translateY(0); }
+  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-generate .spinner {
+    display: none;
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto;
+  }
+
+  .btn-generate.loading .btn-text { display: none; }
+  .btn-generate.loading .spinner { display: block; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Error */
+  .error-box {
+    background: rgba(255,77,109,0.1);
+    border: 1px solid rgba(255,77,109,0.3);
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: var(--red);
+    font-size: 0.88rem;
+    margin-top: 16px;
+    display: none;
+  }
+
+  /* Quiz Section */
+  #quiz-section { display: none; }
+
+  .quiz-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .quiz-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+  }
+
+  .progress-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .progress-pill span { color: var(--text); font-weight: 600; }
+
+  /* Progress bar */
+  .progress-track {
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 100px;
+    margin-bottom: 32px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 100px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Question card */
+  .question-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .question-num {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  .question-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.5;
+    margin-bottom: 28px;
+  }
+
+  .options-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .option-btn {
+    width: 100%;
+    text-align: left;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.93rem;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .option-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    transform: translateX(4px);
+  }
+
+  .option-btn:disabled { cursor: default; }
+
+  .option-letter {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--border);
+    display: grid; place-items: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+
+  .option-btn.correct {
+    border-color: var(--green);
+    background: rgba(34,200,122,0.1);
+  }
+
+  .option-btn.correct .option-letter { background: var(--green); color: #000; }
+
+  .option-btn.wrong {
+    border-color: var(--red);
+    background: rgba(255,77,109,0.1);
+  }
+
+  .option-btn.wrong .option-letter { background: var(--red); color: #fff; }
+
+  .feedback-msg {
+    margin-top: 18px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .feedback-msg.correct { background: rgba(34,200,122,0.12); color: var(--green); }
+  .feedback-msg.wrong   { background: rgba(255,77,109,0.12); color: var(--red); }
+
+  .btn-next {
+    margin-top: 24px;
+    padding: 13px 28px;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    float: right;
+    transition: border-color 0.2s, background 0.2s;
+    display: none;
+  }
+
+  .btn-next:hover { border-color: var(--accent); background: rgba(124,106,255,0.1); }
+
+  /* Results */
+  #results-section {
+    display: none;
+    text-align: center;
+    animation: slideIn 0.5s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .score-ring {
+    width: 160px; height: 160px;
+    margin: 0 auto 28px;
+    position: relative;
+  }
+
+  .score-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+  .score-ring circle {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+  }
+
+  .ring-bg   { stroke: var(--surface2); }
+  .ring-fill { stroke: url(#ringGrad); transition: stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1); }
+
+  .score-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .score-num {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 2.4rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .score-label { font-size: 0.75rem; color: var(--muted); }
+
+  .result-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+  }
+
+  .result-sub { color: var(--muted); font-size: 0.95rem; margin-bottom: 36px; }
+
+  .answers-review { text-align: left; margin-bottom: 28px; }
+
+  .review-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .review-icon {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .review-icon.correct { background: rgba(34,200,122,0.2); color: var(--green); }
+  .review-icon.wrong   { background: rgba(255,77,109,0.2); color: var(--red); }
+
+  .review-q { font-size: 0.88rem; color: var(--muted); margin-bottom: 4px; }
+  .review-a { font-size: 0.93rem; font-weight: 500; }
+  .review-correct { font-size: 0.82rem; color: var(--green); margin-top: 4px; }
+
+  .btn-restart {
+    padding: 14px 36px;
+    background: linear-gradient(135deg, var(--accent), #9b6aff);
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+
+  .btn-restart:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* Confetti canvas */
+  #confetti-canvas {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* Setup section */
+  #setup-section {}
+</style>
+</head>
+<body>
+
+<canvas id="confetti-canvas"></canvas>
+
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-text">QuizCraft</div>
+    </div>
+    <p>Paste any content, let AI generate your quiz in seconds.</p>
+  </header>
+
+  <!-- Setup -->
+  <div id="setup-section">
+    <div class="card">
+      <div class="card-label">Groq API Key</div>
+      <input type="password" id="api-key" placeholder="gsk_..." autocomplete="off" />
+    </div>
+
+    <div class="card">
+      <div class="card-label">Your Content</div>
+      <textarea id="content-input" placeholder="Paste any text here — an article, study notes, a Wikipedia excerpt, a chapter from a book... AI will generate 5 quiz questions from it." maxlength="8000"></textarea>
+      <div class="char-count"><span id="char-count">0</span> / 8000</div>
+    </div>
+
+    <button class="btn-generate" id="generate-btn" onclick="generateQuiz()">
+      <span class="btn-text">✦ Generate Quiz</span>
+      <div class="spinner"></div>
+    </button>
+
+    <div class="error-box" id="error-box"></div>
+  </div>
+
+  <!-- Quiz -->
+  <div id="quiz-section">
+    <div class="quiz-header">
+      <div class="quiz-title">Your Quiz</div>
+      <div class="progress-pill">Question <span id="q-current">1</span> of <span id="q-total">5</span></div>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+    <div class="question-card" id="question-card">
+      <div class="question-num" id="question-num">Question 1</div>
+      <div class="question-text" id="question-text"></div>
+      <div class="options-grid" id="options-grid"></div>
+      <div class="feedback-msg" id="feedback-msg"></div>
+      <button class="btn-next" id="btn-next" onclick="nextQuestion()">Next →</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results-section">
+    <div class="score-ring">
+      <svg viewBox="0 0 100 100">
+        <defs>
+          <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#7c6aff"/>
+            <stop offset="100%" stop-color="#ff6a9e"/>
+          </linearGradient>
+        </defs>
+        <circle class="ring-bg" cx="50" cy="50" r="42"/>
+        <circle class="ring-fill" id="ring-fill" cx="50" cy="50" r="42"
+          stroke-dasharray="263.9" stroke-dashoffset="263.9"/>
+      </svg>
+      <div class="score-text">
+        <div class="score-num" id="score-num">0/5</div>
+        <div class="score-label">score</div>
+      </div>
+    </div>
+    <div class="result-title" id="result-title">Well done!</div>
+    <div class="result-sub" id="result-sub"></div>
+    <div class="answers-review" id="answers-review"></div>
+    <button class="btn-restart" onclick="restartQuiz()">↺ Try Another Quiz</button>
+  </div>
+</div>
+
+<script>
+  let questions = [];
+  let currentQ = 0;
+  let score = 0;
+  let userAnswers = [];
+
+  // Char counter
+  document.getElementById('content-input').addEventListener('input', function() {
+    document.getElementById('char-count').textContent = this.value.length;
+  });
+
+  async function generateQuiz() {
+    const apiKey = document.getElementById('api-key').value.trim();
+    const content = document.getElementById('content-input').value.trim();
+    const errBox = document.getElementById('error-box');
+    errBox.style.display = 'none';
+
+    if (!apiKey) return showError('Please enter your Groq API key.');
+    if (!apiKey.startsWith('gsk_')) return showError('That doesn\'t look like a valid Groq API key (should start with gsk_).');
+    if (content.length < 100) return showError('Please paste at least 100 characters of content to generate meaningful questions.');
+
+    const btn = document.getElementById('generate-btn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+
+    try {
+      const prompt = `You are a quiz generator. Based on the content below, create exactly 5 multiple-choice questions.
+
+Rules:
+- Each question must have exactly 4 options (A, B, C, D)
+- Exactly one option must be correct
+- Questions should test understanding, not just memorization
+- Keep questions clear and concise
+
+Return ONLY a valid JSON array, no markdown, no explanation. Format:
+[
+  {
+    "question": "...",
+    "options": ["option A text", "option B text", "option C text", "option D text"],
+    "correct": 0
+  }
+]
+"correct" is the 0-based index of the correct option.
+
+Content:
+${content.substring(0, 6000)}`;
+
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+          max_tokens: 1500
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || `API error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      const raw = data.choices?.[0]?.message?.content?.trim();
+      if (!raw) throw new Error('No response from Groq. Please try again.');
+
+      const jsonMatch = raw.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) throw new Error('Could not parse quiz from AI response.');
+
+      questions = JSON.parse(jsonMatch[0]);
+      if (!Array.isArray(questions) || questions.length === 0) throw new Error('Invalid quiz format returned.');
+
+      startQuiz();
+
+    } catch (e) {
+      showError(e.message || 'Something went wrong. Please try again.');
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+    }
+  }
+
+  function showError(msg) {
+    const errBox = document.getElementById('error-box');
+    errBox.textContent = '⚠ ' + msg;
+    errBox.style.display = 'block';
+  }
+
+  function startQuiz() {
+    currentQ = 0;
+    score = 0;
+    userAnswers = [];
+    document.getElementById('setup-section').style.display = 'none';
+    document.getElementById('quiz-section').style.display = 'block';
+    document.getElementById('q-total').textContent = questions.length;
+    showQuestion();
+  }
+
+  function showQuestion() {
+    const q = questions[currentQ];
+    document.getElementById('q-current').textContent = currentQ + 1;
+    document.getElementById('question-num').textContent = `Question ${currentQ + 1}`;
+    document.getElementById('question-text').textContent = q.question;
+    document.getElementById('feedback-msg').style.display = 'none';
+    document.getElementById('btn-next').style.display = 'none';
+
+    const pct = (currentQ / questions.length) * 100;
+    document.getElementById('progress-fill').style.width = pct + '%';
+
+    const grid = document.getElementById('options-grid');
+    grid.innerHTML = '';
+    const letters = ['A','B','C','D'];
+
+    q.options.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'option-btn';
+      btn.innerHTML = `<div class="option-letter">${letters[i]}</div><span>${opt}</span>`;
+      btn.onclick = () => selectAnswer(i);
+      grid.appendChild(btn);
+    });
+
+    // Re-trigger animation
+    const card = document.getElementById('question-card');
+    card.style.animation = 'none';
+    card.offsetHeight;
+    card.style.animation = '';
+  }
+
+  function selectAnswer(selectedIdx) {
+    const q = questions[currentQ];
+    const correct = q.correct;
+    const btns = document.querySelectorAll('.option-btn');
+    btns.forEach(b => b.disabled = true);
+
+    const feedback = document.getElementById('feedback-msg');
+    const isCorrect = selectedIdx === correct;
+
+    btns[selectedIdx].classList.add(isCorrect ? 'correct' : 'wrong');
+    if (!isCorrect) btns[correct].classList.add('correct');
+
+    feedback.className = 'feedback-msg ' + (isCorrect ? 'correct' : 'wrong');
+    feedback.textContent = isCorrect
+      ? '✓ Correct! Well done.'
+      : `✗ Not quite. The correct answer is "${q.options[correct]}".`;
+    feedback.style.display = 'block';
+
+    if (isCorrect) score++;
+    userAnswers.push({ selected: selectedIdx, correct });
+
+    document.getElementById('btn-next').style.display = 'inline-block';
+    document.getElementById('btn-next').textContent =
+      currentQ < questions.length - 1 ? 'Next →' : 'See Results →';
+  }
+
+  function nextQuestion() {
+    currentQ++;
+    if (currentQ < questions.length) {
+      showQuestion();
+    } else {
+      showResults();
+    }
+  }
+
+  function showResults() {
+    document.getElementById('quiz-section').style.display = 'none';
+    const rs = document.getElementById('results-section');
+    rs.style.display = 'block';
+
+    const pct = score / questions.length;
+    document.getElementById('score-num').textContent = `${score}/${questions.length}`;
+
+    // Animate ring
+    const circumference = 263.9;
+    setTimeout(() => {
+      document.getElementById('ring-fill').style.strokeDashoffset =
+        circumference - (circumference * pct);
+    }, 100);
+
+    let title, sub;
+    if (pct === 1)      { title = '🎉 Perfect Score!'; sub = 'Outstanding! You nailed every single question.'; }
+    else if (pct >= 0.8) { title = '🌟 Excellent!'; sub = 'You really know your stuff. Great work!'; }
+    else if (pct >= 0.6) { title = '👍 Good Job!'; sub = 'Solid performance. A bit more review and you\'ll ace it.'; }
+    else if (pct >= 0.4) { title = '📚 Keep Learning'; sub = 'You\'re getting there — revisit the material and try again.'; }
+    else                 { title = '💪 Keep Going!'; sub = 'A good start! Review the content and give it another shot.'; }
+
+    document.getElementById('result-title').textContent = title;
+    document.getElementById('result-sub').textContent = sub;
+
+    // Answers review
+    const review = document.getElementById('answers-review');
+    review.innerHTML = '';
+    questions.forEach((q, i) => {
+      const ua = userAnswers[i];
+      const isCorrect = ua.selected === ua.correct;
+      const div = document.createElement('div');
+      div.className = 'review-item';
+      div.innerHTML = `
+        <div class="review-icon ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '✓' : '✗'}</div>
+        <div>
+          <div class="review-q">Q${i+1}: ${q.question}</div>
+          <div class="review-a">You answered: ${q.options[ua.selected]}</div>
+          ${!isCorrect ? `<div class="review-correct">✓ Correct: ${q.options[ua.correct]}</div>` : ''}
+        </div>`;
+      review.appendChild(div);
+    });
+
+    if (pct >= 0.6) launchConfetti();
+  }
+
+  function restartQuiz() {
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('setup-section').style.display = 'block';
+    questions = []; currentQ = 0; score = 0; userAnswers = [];
+  }
+
+  // ——— Confetti ———
+  function launchConfetti() {
+    const canvas = document.getElementById('confetti-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const pieces = [];
+    const colors = ['#7c6aff','#ff6a9e','#22c87a','#ffd700','#00d2ff','#ff9500'];
+    const shapes = ['circle','rect','triangle'];
+
+    for (let i = 0; i < 180; i++) {
+      pieces.push({
+        x: Math.random() * canvas.width,
+        y: -20 - Math.random() * 200,
+        r: 4 + Math.random() * 8,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        shape: shapes[Math.floor(Math.random() * shapes.length)],
+        vx: (Math.random() - 0.5) * 3,
+        vy: 2 + Math.random() * 4,
+        va: (Math.random() - 0.5) * 0.2,
+        angle: Math.random() * Math.PI * 2,
+        opacity: 1
+      });
+    }
+
+    let frame;
+    let startTime = null;
+    const duration = 3500;
+
+    function draw(ts) {
+      if (!startTime) startTime = ts;
+      const elapsed = ts - startTime;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      pieces.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.06;
+        p.angle += p.va;
+        p.opacity = Math.max(0, 1 - Math.max(0, elapsed - 2500) / 1000);
+
+        ctx.save();
+        ctx.globalAlpha = p.opacity;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.fillStyle = p.color;
+
+        if (p.shape === 'circle') {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.shape === 'rect') {
+          ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r);
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(0, -p.r);
+          ctx.lineTo(p.r, p.r);
+          ctx.lineTo(-p.r, p.r);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+
+      if (elapsed < duration) {
+        frame = requestAnimationFrame(draw);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    frame = requestAnimationFrame(draw);
+  }
+</script>
+</body>
+</html>
